@@ -28,4 +28,3 @@ git apply /path/to/cron-napcat-delivery.patch
 ## 说明
 
 - 补丁由 `check-patches.sh` + cron 每周一 9 点守护检测，`hermes update` 后自动重打。
-- 已禁用补丁归档在 `disabled/`（如 `interim-colon-strip.patch`）。
