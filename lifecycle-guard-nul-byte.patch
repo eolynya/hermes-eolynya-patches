@@ -1,0 +1,29 @@
+diff --git a/cron/lifecycle_guard.py b/cron/lifecycle_guard.py
+index ee73aa6..99a595f 100644
+--- a/cron/lifecycle_guard.py
++++ b/cron/lifecycle_guard.py
+@@ -202,7 +202,11 @@ def contains_launchctl_submit_command(command: str) -> bool:
+         index = _command_token_index(segment)
+         if index is None:
+             continue
+-        if Path(segment[index]).name == "launchctl":
++        try:
++            exec_name = Path(segment[index]).name
++        except (OSError, ValueError):
++            continue
++        if exec_name == "launchctl":
+             arguments = segment[index + 1 :]
+             if arguments and arguments[0].lower() in {"submit", "bootstrap"}:
+                 return True
+@@ -354,7 +358,10 @@ def _iter_referenced_shell_scripts(
+         if index is None:
+             continue
+         executable = segment[index]
+-        executable_name = Path(executable).name
++        try:
++            executable_name = Path(executable).name
++        except (OSError, ValueError):
++            continue
+ 
+         if executable_name in {".", "source"}:
+             if len(segment) > index + 1:

@@ -1,0 +1,15 @@
+diff --git a/cron/scheduler.py b/cron/scheduler.py
+index b6b89010..acf67d69 100644
+--- a/cron/scheduler.py
++++ b/cron/scheduler.py
+@@ -259,6 +259,10 @@ _KNOWN_DELIVERY_PLATFORMS = frozenset({
+     "matrix", "mattermost", "homeassistant", "dingtalk", "feishu",
+     "wecom", "wecom_callback", "weixin", "sms", "email", "webhook", "bluebubbles",
+     "qqbot", "yuanbao",
++    # hermes-napcat (OneBot/NapCat QQ adapter) — napcat is a cron delivery
++    # target for this install; without it every napcat:xxx cron job is
++    # blocked by preflight (napcat-added-delivery-platform).
++    "napcat",
+ })
+ 
+ # Platforms that support a configured cron/notification home target, mapped to

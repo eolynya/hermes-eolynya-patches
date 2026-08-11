@@ -1,0 +1,68 @@
+diff --git a/gateway/run.py b/gateway/run.py
+index 40be1f3..35b5072 100644
+--- a/gateway/run.py
++++ b/gateway/run.py
+@@ -87,6 +87,12 @@ _GATEWAY_PROXY_SSE_BUFFER_MAX_CHARS = 16 * 1024 * 1024
+ _TELEGRAM_COMMAND_MENTION_RE = re.compile(r"(?<![\w:/])/([A-Za-z0-9][A-Za-z0-9_-]*)")
+ _GATEWAY_HYGIENE_PLATFORM = "gateway_hygiene"
+ 
++# Absence / auto-reply messages: QQ, Feishu and Weixin prefix "I'm away"
++# replies with "[自动回复]" / "自动回复". These are noise — the gateway drops
++# any inbound message whose text starts with one of these. Marker:
++# _ignore_auto_reply_filter
++_AUTO_REPLY_PREFIXES = ("[自动回复]", "自动回复")
++
+ _TELEGRAM_NOISY_STATUS_RE = re.compile(
+     r"("  # transient/auxiliary status that should stay in logs, not gateway chats
+     r"auxiliary\s+.+\s+failed"
+@@ -8740,6 +8805,26 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
+         return (enriched_text or text).strip()
+ 
+     async def _handle_active_session_busy_message(self, event: MessageEvent, session_key: str) -> bool:
++        # ── Auto-reply / absence-message filter (busy path) ────────────────
++        # The cold path (_handle_message) drops "[自动回复]" messages, but a busy
++        # agent routes follow-ups through steer/queue/interrupt BEFORE the next
++        # _handle_message call — so an auto-reply would still be injected into
++        # the running agent and echoed ("⏩ Steered into current run...").  Filter
++        # here too so busy-path auto-replies are equally silently dropped.
++        # Marker: _ignore_auto_reply_filter
++        if not bool(getattr(event, "internal", False)):
++            try:
++                _steer_auto = (getattr(event, "text", "") or "").strip()
++                if _steer_auto.startswith(_AUTO_REPLY_PREFIXES):
++                    logger.info(
++                        "Dropping auto-reply in busy path from platform %s (id=%s)",
++                        getattr(event.source, "platform", "?"),
++                        getattr(event, "message_id", "?"),
++                    )
++                    return True  # handled (silently dropped); do not steer/queue
++            except Exception:
++                logger.debug("busy auto-reply filter skipped", exc_info=True)
++
+         # --- Authorization gate (#17775) ---
+         # The cold path (_handle_message) checks _is_user_authorized before
+         # creating a session.  The busy path must enforce the same check;
+@@ -14361,6 +14453,23 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
+         # are system-generated and must skip user authorization.
+         is_internal = bool(getattr(event, "internal", False))
+ 
++        # ── Auto-reply / absence-message filter ────────────────────────────
++        # QQ/Feishu/Weixin sign "I'm away" replies with an "[自动回复]" prefix
++        # (also "自动回复"). These are noise — route them so the bot does NOT
++        # burn an agent turn replying to the other side's auto-responder.
++        # Marker: _ignore_auto_reply_filter
++        try:
++            _auto_text = (getattr(event, "text", "") or "").strip()
++            if not is_internal and _auto_text.startswith(_AUTO_REPLY_PREFIXES):
++                logger.info(
++                    "Dropping auto-reply message from platform %s (id=%s)",
++                    getattr(source, "platform", "?"),
++                    getattr(event, "message_id", "?"),
++                )
++                return None
++        except Exception:
++            logger.debug("auto-reply filter skipped", exc_info=True)
++
+         # Ignored-channel guard runs FIRST — before startup-restore queueing,
+         # plugin hooks, auth, and session setup — so a configured ignored
+         # channel can never reach pairing/auth/session state (#51899).

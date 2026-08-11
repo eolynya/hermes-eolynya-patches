@@ -1,0 +1,70 @@
+diff --git a/plugins/platforms/feishu/adapter.py b/plugins/platforms/feishu/adapter.py
+index 8c50942..7b8aafe 100644
+--- a/plugins/platforms/feishu/adapter.py
++++ b/plugins/platforms/feishu/adapter.py
+@@ -436,6 +436,13 @@ class FeishuAdapterSettings:
+     group_rules: Dict[str, FeishuGroupRule] = field(default_factory=dict)
+     allow_bots: str = "none"  # "none" | "mentions" | "all"
+     require_mention: bool = True
++    # Reply threading mode:
++    # - "off": Never reply-to the triggering message — every message is sent
++    #   as a fresh top-level message (no Feishu "reply/引用" styling).
++    # - "first": First chunk of a multi-part reply anchors to the triggering
++    #   message (default).
++    # - "all": All chunks anchor to the triggering message.
++    reply_to_mode: str = "first"
+ 
+ 
+ @dataclass
+@@ -1483,6 +1490,11 @@ class FeishuAdapter(BasePlatformAdapter):
+         super().__init__(config, Platform.FEISHU)
+ 
+         self._settings = self._load_settings(config.extra or {})
++        self._reply_to_mode = self._normalize_reply_to_mode(
++            getattr(config, "reply_to_mode", None)
++            if getattr(config, "reply_to_mode", None) is not None
++            else (config.extra or {}).get("reply_to_mode")
++        )
+         self._apply_settings(self._settings)
+         self._client: Optional[Any] = None
+         # Adapter-owned thread pool for blocking Feishu SDK calls. Routing SDK
+@@ -1541,6 +1553,23 @@ class FeishuAdapter(BasePlatformAdapter):
+         self._pending_processing_reactions: "OrderedDict[str, str]" = OrderedDict()
+         self._load_seen_message_ids()
+ 
++    @staticmethod
++    def _normalize_reply_to_mode(value: Any) -> str:
++        """Normalize reply_to_mode config into 'off' | 'first' | 'all'.
++
++        Accepts the string forms used by other platform adapters ("off",
++        "first", "all") and the boolean form that ``hermes config set
++        platforms.feishu.reply_to_mode off`` writes to YAML (False).
++        """
++        if value is False or value is True:
++            return "off" if value is False else "first"
++        raw = str(value or "").strip().lower()
++        if raw in {"off", "false", "no", "0"}:
++            return "off"
++        if raw in {"all", "every"}:
++            return "all"
++        return "first"
++
+     @staticmethod
+     def _load_settings(extra: Dict[str, Any]) -> FeishuAdapterSettings:
+         # Parse per-group rules from config
+@@ -4800,6 +4829,15 @@ class FeishuAdapter(BasePlatformAdapter):
+         reply_to: Optional[str],
+         metadata: Optional[Dict[str, Any]],
+     ) -> Any:
++        # reply_to_mode="off" → never reply/引用 the triggering message; every
++        # outbound message (text chunks, media, voice, files) is sent as a
++        # fresh top-level message (and never re-anchored into a thread reply).
++        if getattr(self, "_reply_to_mode", "first") == "off":
++            reply_to = None
++            metadata = None if not metadata else dict(metadata)
++            if metadata:
++                metadata.pop("reply_to_message_id", None)
++                metadata.pop("thread_id", None)
+         effective_reply_to = reply_to
+         if not effective_reply_to and metadata and metadata.get("thread_id"):
+             effective_reply_to = metadata.get("reply_to_message_id")
