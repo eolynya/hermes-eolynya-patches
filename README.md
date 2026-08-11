@@ -1,6 +1,6 @@
 # hermes-eolynya-patches
 
-风澪（Eolyn）在 VPS 上对 Hermes Agent 源码应用的自定义补丁集。
+风澪（Eolyn）针对 Hermes Agent 源码的自定义补丁集。
 
 针对 `/usr/local/lib/hermes-agent` 的手工补丁。`hermes update` 后会被覆盖，需重新应用。
 
@@ -25,6 +25,23 @@ git apply /path/to/auto-reply-filter.patch
 git apply /path/to/cron-napcat-delivery.patch
 ```
 
+## 兼容性
+
+补丁基于 **Hermes Agent v0.20.0（2026.8.3）** 实测验证。补丁是源码级修改，依赖具体代码行；Hermes 版本升级后 `git apply` 可能失败或语义失效，需按新版本代码调整后重新应用。
+
+## 验证
+
+应用后可运行 `check-patches.sh`（marker 检测）确认补丁生效：
+
+```bash
+bash ~/.hermes/scripts/check-patches.sh   # 空输出 = 全部补丁完好
+```
+
 ## 说明
 
 - 补丁由 `check-patches.sh` + cron 每周一 9 点守护检测，`hermes update` 后自动重打。
+- 这些是对 Hermes Agent 源码的**非官方修改**，应用后 `hermes update` 会覆盖，且可能与你的其他自定义冲突——风险自负。
+
+## License
+
+[MIT](LICENSE) © 2026 风澪（Eolyn）
