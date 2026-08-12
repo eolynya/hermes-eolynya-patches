@@ -31,10 +31,12 @@ git apply /path/to/cron-napcat-delivery.patch
 
 ## 验证
 
-应用后可运行 `check-patches.sh`（marker 检测）确认补丁生效：
+应用后可运行仓库自带的 `check-patches.sh`（marker 检测）确认补丁生效：
 
 ```bash
-bash ~/.hermes/scripts/check-patches.sh   # 空输出 = 全部补丁完好
+# 默认路径适用于标准安装；如路径不同可显式指定：
+#   HERMES_BASE=/usr/local/lib/hermes-agent PATCH_DIR=/root/.hermes/patches bash check-patches.sh
+bash check-patches.sh   # 空输出 = 全部补丁完好
 ```
 
 ## 说明
