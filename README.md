@@ -12,7 +12,8 @@
 | `fallback-notify.patch` | 在系统提示词标注 fallback 状态，让备用模型知道自己正在顶班 | `agent/chat_completion_helpers.py` |
 | `lifecycle-guard-nul-byte.patch` | 给 `Path(...).name` 加 try/except（OSError/ValueError），防止 NUL 字节 token 崩溃 lifecycle guard | `cron/lifecycle_guard.py` |
 | `auto-reply-filter.patch` | 丢弃以 `[自动回复]`/`自动回复` 开头的入站消息，避免对端自动回复器消耗 agent turn | `gateway/run.py` |
-| `cron-napcat-delivery.patch` | 把 `napcat` 加进 cron 投递白名单，否则 `deliver=napcat:xxx` 的定时任务被 preflight 拦截 | `cron/scheduler.py` |
+
+> 注：`cron-napcat-delivery.patch` 已退役（2026-08-12）——napcat 插件（hermes-napcat-plugin）已通过 `register_platform` 声明 `cron_deliver_env_var` + `standalone_sender_fn`，核心不再需要白名单硬编码。
 
 ## 应用
 
@@ -22,7 +23,6 @@ git apply /path/to/feishu-reply_to_mode.patch
 git apply /path/to/fallback-notify.patch
 git apply /path/to/lifecycle-guard-nul-byte.patch
 git apply /path/to/auto-reply-filter.patch
-git apply /path/to/cron-napcat-delivery.patch
 ```
 
 ## 兼容性

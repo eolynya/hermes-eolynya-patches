@@ -2,9 +2,8 @@
 # Check whether Hermes custom patches are still applied.
 # Used by cron watchdog: empty stdout = all patches intact (silent);
 # non-empty stdout = something lost (alert delivered).
-# Paths can be overridden via env: HERMES_BASE / PATCH_DIR (defaults below).
-BASE="${HERMES_BASE:-/usr/local/lib/hermes-agent}"
-PATCH_DIR="${PATCH_DIR:-/root/.hermes/patches}"
+BASE=/usr/local/lib/hermes-agent
+PATCH_DIR=/root/.hermes/patches
 ALERT=""
 
 # 1. feishu-reply_to_mode.patch — marker: _normalize_reply_to_mode in feishu adapter
@@ -33,12 +32,6 @@ if ! grep -q "_AUTO_REPLY_PREFIXES" "$BASE/gateway/run.py" 2>/dev/null; then
     ALERT="${ALERT}⚠️ auto-reply-filter 补丁已丢失（gateway/run.py _AUTO_REPLY_PREFIXES 部分）\n"
 fi
 
-# 6. cron-napcat-delivery.patch — marker: napcat-added-delivery-platform in cron/scheduler.py
-#    （把 napcat 加进 cron 投递白名单；否则所有 deliver=napcat:xxx 的定时任务被 preflight 拦截）
-if ! grep -q "napcat-added-delivery-platform" "$BASE/cron/scheduler.py" 2>/dev/null; then
-    ALERT="${ALERT}⚠️ cron-napcat-delivery 补丁已丢失（cron/scheduler.py 投递白名单 napcat 部分）\n"
-fi
-
 if [ -n "$ALERT" ]; then
-    echo -e "⚠️ 检测到 Hermes 自定义补丁被覆盖，需要重新应用：\n${ALERT}\n重打命令：cd $BASE && git stash pop 2>/dev/null; git apply $PATCH_DIR/feishu-reply_to_mode.patch 2>/dev/null; git apply $PATCH_DIR/fallback-notify.patch 2>/dev/null; git apply $PATCH_DIR/lifecycle-guard-nul-byte.patch 2>/dev/null; git apply $PATCH_DIR/auto-reply-filter.patch 2>/dev/null; git apply $PATCH_DIR/cron-napcat-delivery.patch 2>/dev/null"
+    echo -e "⚠️ 检测到 Hermes 自定义补丁被覆盖，需要重新应用：\n${ALERT}\n重打命令：cd $BASE && git stash pop 2>/dev/null; git apply $PATCH_DIR/feishu-reply_to_mode.patch 2>/dev/null; git apply $PATCH_DIR/fallback-notify.patch 2>/dev/null; git apply $PATCH_DIR/lifecycle-guard-nul-byte.patch 2>/dev/null; git apply $PATCH_DIR/auto-reply-filter.patch 2>/dev/null"
 fi
