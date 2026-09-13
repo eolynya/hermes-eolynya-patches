@@ -11,7 +11,7 @@
 | `feishu-reply_to_mode.patch` | 飞书适配器支持 `reply_to_mode: off`（回复不引用原消息，直接发独立消息） | `plugins/platforms/feishu/adapter.py` |
 | `fallback-notify.patch` | 在系统提示词标注 fallback 状态，让备用模型知道自己正在顶班 | `agent/chat_completion_helpers.py` |
 | `lifecycle-guard-nul-byte.patch` | 给 `Path(...).name` 加 try/except（OSError/ValueError），防止 NUL 字节 token 崩溃 lifecycle guard | `cron/lifecycle_guard.py` |
-| `auto-reply-filter.patch` | 丢弃以 `[自动回复]`/`自动回复` 开头的入站消息，避免对端自动回复器消耗 agent turn | `gateway/run.py` |
+| `auto-reply-filter.patch` | 丢弃以 `[自动回复]`/`自动回复` 开头的入站消息，避免对端自动回复器消耗 agent turn | `gateway/run.py`（常量）+ `gateway/run_inbound.py`（冷路径）+ `gateway/run_busy.py`（忙时路径） |
 
 > 注：`cron-napcat-delivery.patch` 已退役（2026-08-12）——napcat 插件（hermes-napcat-plugin）已通过 `register_platform` 声明 `cron_deliver_env_var` + `standalone_sender_fn`，核心不再需要白名单硬编码。
 
@@ -19,23 +19,28 @@
 
 ```bash
 cd /usr/local/lib/hermes-agent
-git apply /path/to/feishu-reply_to_mode.patch
-git apply /path/to/fallback-notify.patch
-git apply /path/to/lifecycle-guard-nul-byte.patch
-git apply /path/to/auto-reply-filter.patch
+# 逐个预检：只有能干净应用的才落地，避免半途污染工作区
+for p in feishu-reply_to_mode fallback-notify lifecycle-guard-nul-byte auto-reply-filter; do
+    git apply --check /path/to/$p.patch && git apply /path/to/$p.patch
+done
 ```
+
+> `auto-reply-filter.patch` 的落点随上游模块拆分变化过：v0.20.6 及更早，三处都在 `gateway/run.py`；
+> v0.21.2 起上游把 `gateway/run.py`（约 17k 行）拆成 `run_inbound.py` / `run_busy.py` / `run_turn.py` 等模块——
+> 冷路径落在 `run_inbound.py` 的 `_hm_admit_event()`，忙时路径落在 `run_busy.py` 的
+> `_handle_active_session_busy_message()`；常量仍定义在 `gateway/run.py`（watchdog marker 依赖它）。
 
 ## 兼容性
 
-补丁基于 **Hermes Agent v0.20.0（2026.8.3）** 实测验证。补丁是源码级修改，依赖具体代码行；Hermes 版本升级后 `git apply` 可能失败或语义失效，需按新版本代码调整后重新应用。
+补丁基于 **Hermes Agent v0.21.2（2026.9.11，upstream b6b53c69）** 实测验证。补丁是源码级修改，依赖具体代码行；Hermes 版本升级后 `git apply` 可能失败或语义失效，需按新版本代码调整后重新应用。
 
 ## 验证
 
 应用后可运行仓库自带的 `check-patches.sh`（marker 检测）确认补丁生效：
 
 ```bash
-# 默认路径适用于标准安装；如路径不同可显式指定：
-#   HERMES_BASE=/usr/local/lib/hermes-agent PATCH_DIR=/root/.hermes/patches bash check-patches.sh
+# 默认路径适用于标准安装；如路径不同可用环境变量覆盖：
+#   BASE=/usr/local/lib/hermes-agent PATCH_DIR=/root/.hermes/patches bash check-patches.sh
 bash check-patches.sh   # 空输出 = 全部补丁完好
 ```
 

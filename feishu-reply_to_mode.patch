@@ -1,11 +1,11 @@
 diff --git a/plugins/platforms/feishu/adapter.py b/plugins/platforms/feishu/adapter.py
-index 8c50942..7b8aafe 100644
+index 9c02560c0c..63b4e05ded 100644
 --- a/plugins/platforms/feishu/adapter.py
 +++ b/plugins/platforms/feishu/adapter.py
-@@ -436,6 +436,13 @@ class FeishuAdapterSettings:
-     group_rules: Dict[str, FeishuGroupRule] = field(default_factory=dict)
+@@ -312,6 +312,13 @@ class FeishuAdapterSettings:
      allow_bots: str = "none"  # "none" | "mentions" | "all"
      require_mention: bool = True
+     allow_all_dm: bool = False  # resolved per-profile so multiplexed adapters honor their own .env
 +    # Reply threading mode:
 +    # - "off": Never reply-to the triggering message — every message is sent
 +    #   as a fresh top-level message (no Feishu "reply/引用" styling).
@@ -16,9 +16,9 @@ index 8c50942..7b8aafe 100644
  
  
  @dataclass
-@@ -1483,6 +1490,11 @@ class FeishuAdapter(BasePlatformAdapter):
+@@ -1212,6 +1219,11 @@ class FeishuAdapter(BasePlatformAdapter):
+     def __init__(self, config: PlatformConfig):
          super().__init__(config, Platform.FEISHU)
- 
          self._settings = self._load_settings(config.extra or {})
 +        self._reply_to_mode = self._normalize_reply_to_mode(
 +            getattr(config, "reply_to_mode", None)
@@ -27,8 +27,8 @@ index 8c50942..7b8aafe 100644
 +        )
          self._apply_settings(self._settings)
          self._client: Optional[Any] = None
-         # Adapter-owned thread pool for blocking Feishu SDK calls. Routing SDK
-@@ -1541,6 +1553,23 @@ class FeishuAdapter(BasePlatformAdapter):
+         # Adapter-owned pool for blocking SDK calls, recreated on demand: a torn-down default
+@@ -1260,6 +1272,23 @@ class FeishuAdapter(BasePlatformAdapter):
          self._pending_processing_reactions: "OrderedDict[str, str]" = OrderedDict()
          self._load_seen_message_ids()
  
@@ -51,10 +51,10 @@ index 8c50942..7b8aafe 100644
 +
      @staticmethod
      def _load_settings(extra: Dict[str, Any]) -> FeishuAdapterSettings:
-         # Parse per-group rules from config
-@@ -4800,6 +4829,15 @@ class FeishuAdapter(BasePlatformAdapter):
-         reply_to: Optional[str],
-         metadata: Optional[Dict[str, Any]],
+         def _id_set(values: Any) -> set[str]:
+@@ -3604,6 +3633,15 @@ class FeishuAdapter(BasePlatformAdapter):
+     async def _send_raw_message(
+         self, *, chat_id: str, msg_type: str, payload: str, reply_to: Optional[str], metadata: Optional[Dict[str, Any]],
      ) -> Any:
 +        # reply_to_mode="off" → never reply/引用 the triggering message; every
 +        # outbound message (text chunks, media, voice, files) is sent as a
@@ -65,6 +65,6 @@ index 8c50942..7b8aafe 100644
 +            if metadata:
 +                metadata.pop("reply_to_message_id", None)
 +                metadata.pop("thread_id", None)
-         effective_reply_to = reply_to
-         if not effective_reply_to and metadata and metadata.get("thread_id"):
-             effective_reply_to = metadata.get("reply_to_message_id")
+         thread_id = (metadata or {}).get("thread_id")
+         effective_reply_to = reply_to or ((metadata or {}).get("reply_to_message_id") if thread_id else None)
+         if effective_reply_to:
