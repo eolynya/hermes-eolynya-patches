@@ -1,35 +1,23 @@
 diff --git a/plugins/platforms/feishu/adapter.py b/plugins/platforms/feishu/adapter.py
-index 9c02560c0c..63b4e05ded 100644
+index 92c0d91646..fbaadc1d71 100644
 --- a/plugins/platforms/feishu/adapter.py
 +++ b/plugins/platforms/feishu/adapter.py
-@@ -312,6 +312,13 @@ class FeishuAdapterSettings:
-     allow_bots: str = "none"  # "none" | "mentions" | "all"
-     require_mention: bool = True
-     allow_all_dm: bool = False  # resolved per-profile so multiplexed adapters honor their own .env
-+    # Reply threading mode:
-+    # - "off": Never reply-to the triggering message — every message is sent
-+    #   as a fresh top-level message (no Feishu "reply/引用" styling).
-+    # - "first": First chunk of a multi-part reply anchors to the triggering
-+    #   message (default).
-+    # - "all": All chunks anchor to the triggering message.
-+    reply_to_mode: str = "first"
- 
- 
- @dataclass
-@@ -1212,6 +1219,11 @@ class FeishuAdapter(BasePlatformAdapter):
-     def __init__(self, config: PlatformConfig):
+@@ -1301,6 +1301,13 @@ class FeishuAdapter(BasePlatformAdapter):
          super().__init__(config, Platform.FEISHU)
          self._settings = self._load_settings(config.extra or {})
+         self._apply_settings(self._settings)
++        # Patched by eolyn: reply threading mode ("off" | "first" | "all").
++        # Set AFTER _apply_settings so a dataclass mirror cannot overwrite it.
 +        self._reply_to_mode = self._normalize_reply_to_mode(
 +            getattr(config, "reply_to_mode", None)
 +            if getattr(config, "reply_to_mode", None) is not None
 +            else (config.extra or {}).get("reply_to_mode")
 +        )
-         self._apply_settings(self._settings)
          self._client: Optional[Any] = None
          # Adapter-owned pool for blocking SDK calls, recreated on demand: a torn-down default
-@@ -1260,6 +1272,23 @@ class FeishuAdapter(BasePlatformAdapter):
-         self._pending_processing_reactions: "OrderedDict[str, str]" = OrderedDict()
+         # executor can no longer wedge sends with "Executor shutdown has been called".
+@@ -1348,6 +1355,23 @@ class FeishuAdapter(BasePlatformAdapter):
+         self._pending_processing_reactions: OrderedDict[str, str] = OrderedDict()
          self._load_seen_message_ids()
  
 +    @staticmethod
@@ -50,15 +38,14 @@ index 9c02560c0c..63b4e05ded 100644
 +        return "first"
 +
      @staticmethod
-     def _load_settings(extra: Dict[str, Any]) -> FeishuAdapterSettings:
+     def _load_settings(extra: dict[str, Any]) -> FeishuAdapterSettings:
          def _id_set(values: Any) -> set[str]:
-@@ -3604,6 +3633,15 @@ class FeishuAdapter(BasePlatformAdapter):
+@@ -3779,6 +3803,14 @@ class FeishuAdapter(BasePlatformAdapter):
      async def _send_raw_message(
-         self, *, chat_id: str, msg_type: str, payload: str, reply_to: Optional[str], metadata: Optional[Dict[str, Any]],
+         self, *, chat_id: str, msg_type: str, payload: str, reply_to: Optional[str], metadata: Optional[dict[str, Any]],
      ) -> Any:
-+        # reply_to_mode="off" → never reply/引用 the triggering message; every
-+        # outbound message (text chunks, media, voice, files) is sent as a
-+        # fresh top-level message (and never re-anchored into a thread reply).
++        # Patched by eolyn: reply_to_mode="off" → never reply/引用 the triggering
++        # message; every outbound message is sent as a fresh top-level message.
 +        if getattr(self, "_reply_to_mode", "first") == "off":
 +            reply_to = None
 +            metadata = None if not metadata else dict(metadata)

@@ -1,8 +1,8 @@
 diff --git a/gateway/run.py b/gateway/run.py
-index b615dc9a80..9573f01149 100644
+index 8c13380e95..21e239c077 100644
 --- a/gateway/run.py
 +++ b/gateway/run.py
-@@ -65,6 +65,12 @@ _GATEWAY_PROXY_SSE_BUFFER_MAX_CHARS = 16 * 1024 * 1024
+@@ -74,6 +74,12 @@ _GATEWAY_PROXY_SSE_BUFFER_MAX_CHARS = 16 * 1024 * 1024
  _TELEGRAM_COMMAND_MENTION_RE = re.compile(r"(?<![\w:/])/([A-Za-z0-9][A-Za-z0-9_-]*)")
  _GATEWAY_HYGIENE_PLATFORM = "gateway_hygiene"
  
@@ -16,10 +16,10 @@ index b615dc9a80..9573f01149 100644
      r"("  # transient/auxiliary status that should stay in logs, not gateway chats
      r"auxiliary\s+.+\s+failed"
 diff --git a/gateway/run_busy.py b/gateway/run_busy.py
-index 2688b957e3..72b79fc63a 100644
+index 044a6136da..951595a271 100644
 --- a/gateway/run_busy.py
 +++ b/gateway/run_busy.py
-@@ -653,6 +653,27 @@ class GatewayBusySessionMixin:
+@@ -928,6 +928,27 @@ class GatewayBusySessionMixin:
              logger.debug("Failed to send busy-ack: %s", e)
  
      async def _handle_active_session_busy_message(self, event: MessageEvent, session_key: str) -> bool:
@@ -48,10 +48,10 @@ index 2688b957e3..72b79fc63a 100644
          # handling, without merging their text into an already queued human message.
          if event.internal and event.allow_gateway_control:
 diff --git a/gateway/run_inbound.py b/gateway/run_inbound.py
-index 3c5028cb61..01362e43b6 100644
+index 58f521e4b5..a6030ad179 100644
 --- a/gateway/run_inbound.py
 +++ b/gateway/run_inbound.py
-@@ -152,6 +152,25 @@ class GatewayInboundMixin:
+@@ -181,6 +181,25 @@ class GatewayInboundMixin(GatewayInboundHooksMixin, GatewayInboundTranscriptionM
  
          is_internal = bool(getattr(event, "internal", False))  # e.g. background-process notifications
  
