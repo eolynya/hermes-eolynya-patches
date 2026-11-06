@@ -2,25 +2,25 @@
 
 风澪（Eolyn）针对 Hermes Agent 源码的自定义补丁集。
 
-针对 `/usr/local/lib/hermes-agent` 的手工补丁。`hermes update` 后会被覆盖，需重新应用。
+针对 `~/.hermes/hermes-agent`（旧版本安装在 `/usr/local/lib/hermes-agent`）的手工补丁。`hermes update` 后会被覆盖，需重新应用。
 
 ## 补丁列表
 
 | 补丁 | 作用 | 改动文件 |
 |------|------|----------|
-| `feishu-reply_to_mode.patch` | 飞书适配器支持 `reply_to_mode: off`（回复不引用原消息，直接发独立消息） | `plugins/platforms/feishu/adapter.py` |
-| `fallback-notify.patch` | 在系统提示词标注 fallback 状态，让备用模型知道自己正在顶班 | `agent/chat_completion_helpers.py` |
-| `lifecycle-guard-nul-byte.patch` | 给 `Path(...).name` 加 try/except（OSError/ValueError），防止 NUL 字节 token 崩溃 lifecycle guard | `cron/lifecycle_guard.py` |
+| `feishu-reply_to_mode.patch` | 飞书适配器支持 `reply_to_mode: off/first/all`（off = 回复不引用原消息，直接发独立消息） | `plugins/platforms/feishu/adapter.py` |
 | `auto-reply-filter.patch` | 丢弃以 `[自动回复]`/`自动回复` 开头的入站消息，避免对端自动回复器消耗 agent turn | `gateway/run.py`（常量）+ `gateway/run_inbound.py`（冷路径）+ `gateway/run_busy.py`（忙时路径） |
 
 > 注：`cron-napcat-delivery.patch` 已退役（2026-08-12）——napcat 插件（hermes-napcat-plugin）已通过 `register_platform` 声明 `cron_deliver_env_var` + `standalone_sender_fn`，核心不再需要白名单硬编码。
+>
+> 注：`lifecycle-guard-nul-byte.patch`（2026-11-07）、`fallback-notify.patch`（2026-11-07）均已删除——前者触发概率过低、维护成本高于收益；后者本机未配置 fallback chain，无触发场景。
 
 ## 应用
 
 ```bash
-cd /usr/local/lib/hermes-agent
+cd ~/.hermes/hermes-agent
 # 逐个预检：只有能干净应用的才落地，避免半途污染工作区
-for p in feishu-reply_to_mode fallback-notify lifecycle-guard-nul-byte auto-reply-filter; do
+for p in feishu-reply_to_mode auto-reply-filter; do
     git apply --check /path/to/$p.patch && git apply /path/to/$p.patch
 done
 ```
@@ -32,15 +32,17 @@ done
 
 ## 兼容性
 
-补丁基于 **Hermes Agent v0.21.2（2026.9.11，upstream b6b53c69）** 实测验证。补丁是源码级修改，依赖具体代码行；Hermes 版本升级后 `git apply` 可能失败或语义失效，需按新版本代码调整后重新应用。
+补丁基于 **Hermes Agent v0.22.6（2026.9.24，local f0d94882e8）** 重新适配并验证。补丁是源码级修改，依赖具体代码行；Hermes 版本升级后 `git apply` 可能失败或语义失效，需按新版本代码调整后重新应用。
+
+v0.22.6 适配要点：`FeishuAdapter` 的 `_apply_settings()` 会把 dataclass 字段镜像成 `self._<field>`，因此 `_reply_to_mode` 必须在 `_apply_settings()` **之后**赋值，否则会被镜像覆盖成默认值。
 
 ## 验证
 
 应用后可运行仓库自带的 `check-patches.sh`（marker 检测）确认补丁生效：
 
 ```bash
-# 默认路径适用于标准安装；如路径不同可用环境变量覆盖：
-#   BASE=/usr/local/lib/hermes-agent PATCH_DIR=/root/.hermes/patches bash check-patches.sh
+# BASE 自动探测 ~/.hermes/hermes-agent，缺失时回落到 /usr/local/lib/hermes-agent；
+# 也可显式覆盖：BASE=/path/to/hermes-agent PATCH_DIR=/root/.hermes/patches
 bash check-patches.sh   # 空输出 = 全部补丁完好
 ```
 
